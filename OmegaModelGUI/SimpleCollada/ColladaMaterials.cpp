@@ -118,19 +118,19 @@ void ColladaMaterials::ImportLibraryMaterials(OMFConverter::ModelInfo *model)
 		// shininess
 		index = m_xmlParse->FindChildElementInBuffer("effect", "shininess", effectsBuffer, startIndex);
 		if (index != UINT32_MAX) {
-			material.Color.shininess = m_xmlParse->ReadElementDataFloat("float", effectsBuffer, index + 1);
+			material.Color.metallic = m_xmlParse->ReadElementDataFloat("float", effectsBuffer, index + 1);
 		}
 		else {
-			material.Color.shininess = 0.0f;
+			material.Color.metallic = 0.0f;
 		}
 
 		// transparency
 		index = m_xmlParse->FindChildElementInBuffer("effect", "transparency", effectsBuffer, startIndex);
 		if (index != UINT32_MAX) {
-			material.Color.transparency = m_xmlParse->ReadElementDataFloat("float", effectsBuffer, index + 1);
+			material.Color.roughness = m_xmlParse->ReadElementDataFloat("float", effectsBuffer, index + 1);
 		}
 		else {
-			material.Color.transparency = 0.0f;
+			material.Color.roughness = 0.0f;
 		}
 
 		model->materials.push_back(material);

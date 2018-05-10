@@ -48,8 +48,8 @@ public:
 			glm::vec3 ambient;
 			glm::vec3 diffuse;
 			glm::vec3 specular;
-			float shininess;
-			float transparency;
+			float roughness;
+			float metallic;
 		} Color;
 
 		struct TexMap
@@ -161,5 +161,6 @@ private:
 
 	Archiver *p_archive;
 
+	uint32_t m_currentIndex;
 };
 

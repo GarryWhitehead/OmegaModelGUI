@@ -26,7 +26,8 @@ struct objMaterial
 		glm::vec3 ambient;
 		glm::vec3 diffuse;
 		glm::vec3 specular;
-		float specularExp;
+		float roughness;
+		float metallic;
 	} Color;
 
 	struct TexMap

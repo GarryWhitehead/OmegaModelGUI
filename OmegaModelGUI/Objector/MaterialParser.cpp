@@ -87,21 +87,25 @@ std::string MaterialParser::ProcessNewMaterial(std::string fileDir, OMFConverter
 				mat.Map.albedo = fileDir + filename;
 			}
 			// diffuse specular map
-			else if (type == "map_Kn") {
+			else if (type == "map_Bump") {
 				ss >> filename;
 				mat.Map.normal = fileDir + filename;
 			}
-			else if (type == "map_Kao") {
+			else if (type == "map_Pao") {
 				ss >> filename;
 				mat.Map.ao = fileDir + filename;
 			}
-			else if (type == "map_Km") {
+			else if (type == "map_Pm") {
 				ss >> filename;
 				mat.Map.metallic = fileDir + filename;
 			}
-			else if (type == "map_Kr") {
+			else if (type == "map_Pr") {
 				ss >> filename;
 				mat.Map.roughness = fileDir + filename;
+			}
+			else if (type == "map_Ks") {
+				ss >> filename;
+				mat.Map.specular = fileDir + filename;
 			}
 
 			// check whether the string contains colour information
@@ -120,8 +124,17 @@ std::string MaterialParser::ProcessNewMaterial(std::string fileDir, OMFConverter
 				ss >> x; ss >> y; ss >> z;
 				mat.Color.specular = glm::vec3(x, y, z);
 			}
+			// roughness colour
+			else if (type == "Pr") {
+				ss >> x;
+				mat.Color.roughness = x;
+			}
+			// metallic colour
+			else if (type == "Pm") {
+				ss >> x;
+				mat.Color.metallic =  x;
+			}
 				
-			// TODO : add opacity, illum
 		}
 	}
 

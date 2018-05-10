@@ -94,7 +94,7 @@ void Archiver::Serialise(double& value, const var_info& info)
 	std::string line;
 	SerialiseText<double>(value, info, line);
 	if (!line.empty())
-		value = (std::stod(line) == 0) ? false : true;
+		value = std::stod(line);
 }
 
 void Archiver::Serialise(std::string& str, const var_info& info)
@@ -142,8 +142,8 @@ void Archiver::Serialise(OMFConverter::Material& material, const Archiver::var_i
 	Serialise(material.Color.ambient, info.name + "ambient");
 	Serialise(material.Color.diffuse, info.name + "diffuse");
 	Serialise(material.Color.specular, info.name + "specular");
-	Serialise(material.Color.shininess, info.name + "shininess");
-	Serialise(material.Color.transparency, info.name + "transparency");
+	Serialise(material.Color.roughness, info.name + "roughness");
+	Serialise(material.Color.metallic, info.name + "metallic");
 
 	// materials texture maps
 	Serialise(material.Map.albedo, info.name + "albedo");

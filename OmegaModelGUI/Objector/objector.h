@@ -31,8 +31,7 @@ public:
 private:
 
 	// private member functions
-	void CreateMesh(std::string name, OMFConverter::ModelInfo *model, std::fstream& file);
-	void ProcessGroup(OMFConverter::Mesh& mesh, OMFConverter::ModelInfo *model, std::fstream& file);
+	void ProcessGroup(OMFConverter::Mesh& mesh, std::vector<std::string>& buffer, uint32_t& index);
 	void ProcessIndicies(std::string str, OMFConverter::FaceInfo& face, OMFConverter::Mesh& mesh);
 
 	MaterialParser *materialParser;

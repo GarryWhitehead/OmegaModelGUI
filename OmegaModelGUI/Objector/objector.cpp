@@ -7,6 +7,7 @@
 #include <iostream>
 
 Objector::Objector() :
+	m_nextIndex(0),
 	m_objFileImported(false)
 {
 	m_tempPos.clear();
@@ -15,31 +16,34 @@ Objector::Objector() :
 }
 
 
-Objector::~Objector()
+Objector::~Objector() 
 {
 }
 
 void Objector::ImportObjFile(std::string filename, OMFConverter::ModelInfo *model)
-{	
+{
+	materialParser = new MaterialParser();
+
 	// Open file
 	std::fstream file;
+	std::vector <std::string> buffer;
+
 	file.open(filename, std::ios::in);
 	if (!file.is_open()) {
 		return;
 	}
-	
-	materialParser = new MaterialParser();
 
-	m_nextIndex = 0;
-
-	std::string fileDir = filename.substr(0, filename.find_last_of('/') + 1);
-	
-	// save old position in the case of vertices (v) designator is found
-	int oldPos = file.tellg();
-
+	// read complete .obj file into container
 	std::string str;
 	while (getline(file, str)) {
+		buffer.push_back(str);
+	}
+
+	uint32_t index = 0;
+	while (index < buffer.size()) {
 		
+		str = buffer[index];
+
 		// start by removing the comments from each line
 		if (!objUtility.RemoveCommentsFromStr(str)) {
 
@@ -50,9 +54,11 @@ void Objector::ImportObjFile(std::string filename, OMFConverter::ModelInfo *mode
 			// check whether a material file is specified
 			if (type == "mtllib") {
 
-				std::string filename;
-				ss >> filename;
-				materialParser->ImportMtlFile(fileDir, filename, model);
+				std::string fileDir = filename.substr(0, filename.find_last_of('/') + 1);
+
+				std::string matFilename;
+				ss >> matFilename;
+				materialParser->ImportMtlFile(fileDir, matFilename, model);
 				model->numMaterials = model->materials.size();
 			}
 
@@ -60,21 +66,24 @@ void Objector::ImportObjFile(std::string filename, OMFConverter::ModelInfo *mode
 			// 'g' denotes a group object in .obj format
 			else if (type == "g" || type == "o") {
 
-				std::string name;
-				ss >> name;
+				OMFConverter::Mesh mesh;
+				ss >> mesh.meshName;
 
-				CreateMesh(name, model, file);
+				*g_filelog << "Group: " << mesh.meshName << ", Processing Data......\n";
+
+				// process the group data into the relevant containers
+				++index;
+				this->ProcessGroup(mesh, buffer, index);
+				model->meshData.push_back(mesh);
+
 			}
 			else if (type == "v") {
-
-				// step back to the file position before this so we don't miss this data
-				file.seekg(oldPos);
 
 				// some .obj files have the group data towards the end of the file, so for now, load the vertex data into the temp buffers		
 				*g_filelog << "No group identifier. Processing data anyway....\n";
 
 				OMFConverter::Mesh mesh;						// dummy mesh: as no group has been identified, only process the vertices,etc. into temp buffers
-				this->ProcessGroup(mesh, model, file);
+				this->ProcessGroup(mesh, buffer, index);
 
 				// in some cases, the.obj file contains no group info whatsoever, so if face data has been processed, assume this is the case
 				if (!mesh.faceData.empty()) {
@@ -84,6 +93,7 @@ void Objector::ImportObjFile(std::string filename, OMFConverter::ModelInfo *mode
 				}
 			}
 		}
+		++index;
 	}
 
 	model->numMeshes = model->meshData.size();
@@ -92,99 +102,84 @@ void Objector::ImportObjFile(std::string filename, OMFConverter::ModelInfo *mode
 	*g_filelog << "Imported data successfully!\n";
 }
 
-void Objector::CreateMesh(std::string name, OMFConverter::ModelInfo *model, std::fstream& file)
-{
-	OMFConverter::Mesh mesh;
-	mesh.meshName = name;
-
-	*g_filelog << "Group: " << mesh.meshName << ", Processing Data......\n";
-
-	// process the group data into the relevant containers
-	this->ProcessGroup(mesh, model, file);
-	model->meshData.push_back(mesh);
-}
-
-void Objector::ProcessGroup(OMFConverter::Mesh& mesh, OMFConverter::ModelInfo *model, std::fstream& file)
+void Objector::ProcessGroup(OMFConverter::Mesh& mesh, std::vector<std::string>& buffer, uint32_t& index)
 {
 	std::string str;
 
-	while (!file.eof()) {
+	// now sort all the vert, norm and indicies into their relevant containers
+	while (index < buffer.size()) {
 
-		// now sort all the vert, norm and indicies into their relevant containers
-		while (getline(file, str)) {
- 
-			if (!objUtility.RemoveCommentsFromStr(str)) {
+		str = buffer[index];
+		
+		if (!objUtility.RemoveCommentsFromStr(str)) {
 
-				std::stringstream ss(str);
-				std::string type;
-				ss >> type;
+			std::stringstream ss(str);
+			std::string type;
+			ss >> type;
 
-				// if we have found another object or group, return
-				if (type == "o" || type == "g") {
+			// if we have found another object or group, return
+			if (type == "o" || type == "g") {
 					
-					std::string name;
-					ss >> name;
+				--index;
+				return;
+			}
 
-					CreateMesh(name, model, file);
-					return;
-				}
+			// store the material used by this mesh - this will be used by the engine to associate meshes with materials
+			if (type == "usemtl") {
 
-				// store the material used by this mesh - this will be used by the engine to associate meshes with materials
-				if (type == "usemtl") {
+				std::string mat;
+				ss >> mat;
+				mesh.material = mat;
+			}
 
-					std::string mat;
-					ss >> mat;
-					mesh.material = mat;
-				}
+			// or conatins normal data (vn)
+			else if (type == "vn") {
+				glm::vec3  norm;
+				ss >> norm.x;
+				ss >> norm.y;
+				ss >> norm.z;
+				m_tempNorm.push_back(norm);
+				//std::cout << "norm data - xyz: " << norm.x << ", " << norm.y << ", " << norm.z << "\n";
+			}
 
-				// or conatins normal data (vn)
-				else if (type == "vn") {
-					glm::vec3  norm;
-					ss >> norm.x;
-					ss >> norm.y;
-					ss >> norm.z;
-					m_tempNorm.push_back(norm);
-					//std::cout << "norm data - xyz: " << norm.x << ", " << norm.y << ", " << norm.z << "\n";
-				}
+			// or conatins texture uv (vt)
+			else if (type == "vt") {
+				glm::vec2  uv;
+				ss >> uv.x;
+				ss >> uv.y;
+				m_tempUv.push_back(uv);
+				//std::cout << "uv data - uv: " << uv.x << ", " << uv.y << "\n";
+			}
 
-				// or conatins texture uv (vt)
-				else if (type == "vt") {
-					glm::vec2  uv;
-					ss >> uv.x;
-					ss >> uv.y;
-					m_tempUv.push_back(uv);
-					//std::cout << "uv data - uv: " << uv.x << ", " << uv.y << "\n";
-				}
+			// or conatins vertex data (vn)
+			else if (type == "v") {
+				glm::vec3  vert;
+				ss >> vert.x;
+				ss >> vert.y;	
+				ss >> vert.z;
+				m_tempPos.push_back(vert);
+				//std::cout << "vert data - xyz: " << vert.x << ", " << vert.y << ", " << vert.z << "\n";
 
-				// or conatins vertex data (vn)
-				else if (type == "v") {
-					glm::vec3  vert;
-					ss >> vert.x;
-					ss >> vert.y;
-					ss >> vert.z;
-					m_tempPos.push_back(vert);
-					//std::cout << "vert data - xyz: " << vert.x << ", " << vert.y << ", " << vert.z << "\n";
+				// certain .obj files have colour information stored at the end of the position data. So, check whether this is the end of the string
+				if (!ss.eof()) {
 
-					// certain .obj files have colour information stored at the end of the position data. So, check whether this is the end of the string
-					if (!ss.eof()) {
-
-						glm::vec3 color;
-						ss >> color.r;
-						ss >> color.g;
-						ss >> color.b;
-						m_tempColor.push_back(color);
-					}
-				}
-
-				// or conatins indices (face) data (f)
-				else if (type == "f") {
-
-					OMFConverter::FaceInfo face;
-					this->ProcessIndicies(str, face, mesh);
-					mesh.faceData.push_back(face);
+					glm::vec3 color;
+					ss >> color.r;
+					ss >> color.g;
+					ss >> color.b;
+					m_tempColor.push_back(color);
 				}
 			}
+
+			// or conatins indices (face) data (f)
+			else if (type == "f") {
+
+				OMFConverter::FaceInfo face;
+				this->ProcessIndicies(str, face, mesh);
+				mesh.faceData.push_back(face);
+			}
 		}
+		++index;
 	}
 }
 
@@ -249,7 +244,7 @@ void Objector::ProcessIndicies(std::string str, OMFConverter::FaceInfo& face, OM
 				}
 
 				face.indices.push_back(m_nextIndex);				// index this unique key in the indices buffer
-
+				
 				m_indexRef.insert(std::make_pair(key, m_nextIndex));	// and add to index reference map 
 				++m_nextIndex;
 			}
